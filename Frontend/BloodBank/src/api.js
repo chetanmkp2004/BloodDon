@@ -1,6 +1,6 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
-const API_BASE_URL = 'http://127.0.0.1:8000/api';
+const API_BASE_URL = 'https://chetanmk.pythonanywhere.com/api';
 
 class ApiService {
   async makeRequest(endpoint, options = {}) {
@@ -108,6 +108,14 @@ class ApiService {
 
   async getProfile() {
     return this.makeRequest('/profile/');
+  }
+
+  async getDonationHistory() {
+    return this.makeRequest('/donations/');
+  }
+
+  async getEmergencyRequests() {
+    return this.makeRequest('/emergency-requests/');
   }
 
   async refreshToken() {

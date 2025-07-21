@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import {
   StyleSheet,
   View,
@@ -9,12 +9,19 @@ import {
   Dimensions,
   RefreshControl,
   Alert,
+  Animated,
+  Platform,
 } from 'react-native';
 import { router } from 'expo-router';
 import { useAuth } from '../src/AuthContext';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import NavigationBar from '../components/NavigationBar';
+import { PieChart } from 'react-native-chart-kit';
+import Svg, { Circle } from 'react-native-svg';
+import * as Haptics from 'expo-haptics';
+import { ActivityIndicator } from 'react-native';
+import { SharedElement } from 'react-native-shared-element';
 
 const { width, height } = Dimensions.get('window');
 
@@ -23,24 +30,86 @@ interface DashboardStats {
   lastDonation: string;
   nextEligible: string;
   bloodType: string;
+  impactScore: number;
+  donationsThisYear: number;
+  livesImpacted: number;
 }
 
 export default function DashboardScreen() {
   const { user, logout, loading } = useAuth();
   const [refreshing, setRefreshing] = useState(false);
   const [stats, setStats] = useState<DashboardStats>({
-    totalDonations: 0,
-    lastDonation: 'Never',
-    nextEligible: 'Now',
-    bloodType: 'Unknown',
+    totalDonations: 5,
+    lastDonation: '2025-06-15',
+    nextEligible: '2025-08-10',
+    bloodType: 'O+',
+    impactScore: 78,
+    donationsThisYear: 3,
+    livesImpacted: 15,
   });
+
+  // Animation values
+  const headerScaleAnim = useRef(new Animated.Value(0.95)).current;
+  const fadeAnim = useRef(new Animated.Value(0)).current;
+  const statsScaleAnim = useRef(new Animated.Value(0.9)).current;
+  const impactProgressAnim = useRef(new Animated.Value(0)).current;
+  const heartbeatAnim = useRef(new Animated.Value(1)).current;
 
   useEffect(() => {
     // Check authentication
     if (!loading && !user) {
       router.replace('/login');
     }
+
+    // Start animations
+    Animated.parallel([
+      Animated.spring(headerScaleAnim, {
+        toValue: 1,
+        tension: 10,
+        friction: 3,
+        useNativeDriver: true,
+      }),
+      Animated.timing(fadeAnim, {
+        toValue: 1,
+        duration: 800,
+        useNativeDriver: true,
+      }),
+      Animated.spring(statsScaleAnim, {
+        toValue: 1,
+        tension: 50,
+        friction: 3,
+        useNativeDriver: true,
+        delay: 300,
+      }),
+      Animated.timing(impactProgressAnim, {
+        toValue: stats.impactScore / 100,
+        duration: 1500,
+        useNativeDriver: false,
+        delay: 500,
+      }),
+    ]).start();
+
+    // Start heartbeat animation
+    startHeartbeatAnimation();
   }, [user, loading]);
+
+  const startHeartbeatAnimation = () => {
+    Animated.loop(
+      Animated.sequence([
+        Animated.timing(heartbeatAnim, {
+          toValue: 1.15,
+          duration: 200,
+          useNativeDriver: true,
+        }),
+        Animated.timing(heartbeatAnim, {
+          toValue: 1,
+          duration: 400,
+          useNativeDriver: true,
+        }),
+        Animated.delay(1000),
+      ])
+    ).start();
+  };
 
   const onRefresh = async () => {
     setRefreshing(true);
@@ -60,12 +129,22 @@ export default function DashboardScreen() {
           text: 'Logout', 
           style: 'destructive',
           onPress: async () => {
+            if (Platform.OS !== 'web') {
+              Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+            }
             await logout();
             router.replace('/login');
           }
         },
       ]
     );
+  };
+
+  const handleActionPress = (action: string) => {
+    if (Platform.OS !== 'web') {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    }
+    Alert.alert('Feature Coming Soon', `${action} will be available soon!`);
   };
 
   const quickActions = [
@@ -75,7 +154,7 @@ export default function DashboardScreen() {
       subtitle: 'Book an appointment',
       icon: 'heart',
       color: '#DC143C',
-      onPress: () => Alert.alert('Feature Coming Soon', 'Donation scheduling will be available soon!'),
+      onPress: () => handleActionPress('Donation scheduling'),
     },
     {
       id: 'history',
@@ -83,7 +162,7 @@ export default function DashboardScreen() {
       subtitle: 'View past donations',
       icon: 'time',
       color: '#1E40AF',
-      onPress: () => Alert.alert('Feature Coming Soon', 'Donation history will be available soon!'),
+      onPress: () => router.push('/history'),
     },
     {
       id: 'emergency',
@@ -91,7 +170,7 @@ export default function DashboardScreen() {
       subtitle: 'Urgent blood needed',
       icon: 'alert-circle',
       color: '#DC143C',
-      onPress: () => Alert.alert('Feature Coming Soon', 'Emergency requests will be available soon!'),
+      onPress: () => router.push('/emergency'),
     },
     {
       id: 'rewards',
@@ -99,7 +178,7 @@ export default function DashboardScreen() {
       subtitle: 'Track achievements',
       icon: 'trophy',
       color: '#B91C1C',
-      onPress: () => Alert.alert('Feature Coming Soon', 'Rewards system will be available soon!'),
+      onPress: () => handleActionPress('Rewards system'),
     },
   ];
 
@@ -110,22 +189,35 @@ export default function DashboardScreen() {
           colors={['#F8FAFC', '#F1F5F9']}
           style={StyleSheet.absoluteFillObject}
         />
-        <View style={styles.loadingContent}>
-          <View style={styles.loadingSpinner}>
-            <Ionicons name="heart" size={30} color="#DC143C" />
-          </View>
-          <Text style={styles.loadingText}>Loading Dashboard...</Text>
+        <View style={styles.loadingAnimation}>
+          <ActivityIndicator size="large" color="#DC143C" />
         </View>
+        <Text style={styles.loadingText}>Loading Dashboard...</Text>
       </View>
     );
   }
+
+  // Chart data for blood donation types
+  const chartData = [
+    { name: 'Whole Blood', count: 3, color: '#DC2626' },
+    { name: 'Plasma', count: 1, color: '#FBBF24' },
+    { name: 'Platelets', count: 1, color: '#3B82F6' },
+  ];
 
   return (
     <View style={styles.container}>
       <StatusBar barStyle="dark-content" backgroundColor="#FFFFFF" />
       
       {/* Professional Header */}
-      <View style={styles.header}>
+      <Animated.View 
+        style={[
+          styles.header,
+          {
+            opacity: fadeAnim,
+            transform: [{ scale: headerScaleAnim }]
+          }
+        ]}
+      >
         <LinearGradient
           colors={['#FFFFFF', '#F8FAFC']}
           style={styles.headerGradient}
@@ -133,22 +225,33 @@ export default function DashboardScreen() {
           <View style={styles.headerContent}>
             <View style={styles.userInfo}>
               <View style={styles.avatarContainer}>
-                <LinearGradient
-                  colors={['#DC143C', '#B91C1C']}
-                  style={styles.avatar}
-                >
-                  <Text style={styles.avatarText}>
-                    {user?.first_name?.charAt(0) || user?.username?.charAt(0) || 'U'}
-                  </Text>
-                </LinearGradient>
+                <SharedElement id="user-avatar" onNode={() => {}}>
+                  <LinearGradient
+                    colors={['#DC143C', '#B91C1C']}
+                    style={styles.avatar}
+                  >
+                    <Text style={styles.avatarText}>
+                      {user?.first_name?.charAt(0) || user?.username?.charAt(0) || 'U'}
+                    </Text>
+                  </LinearGradient>
+                </SharedElement>
                 <View style={styles.statusIndicator}>
                   <View style={styles.onlineStatus} />
                 </View>
               </View>
               <View style={styles.userDetails}>
-                <Text style={styles.welcomeText}>Welcome back,</Text>
+                <Text style={styles.welcomeText}>Welcome back</Text>
                 <Text style={styles.userName}>
-                  {user?.first_name ? `${user.first_name} ${user.last_name}` : user?.username}
+                  {(() => {
+                    const first = user?.first_name?.trim();
+                    const last = user?.last_name?.trim();
+                    if (first || last) return `${first || ''}${last ? ' ' + last : ''}`.trim();
+                    const nested = user?.user;
+                    const nFirst = nested?.first_name?.trim();
+                    const nLast = nested?.last_name?.trim();
+                    if (nFirst || nLast) return `${nFirst || ''}${nLast ? ' ' + nLast : ''}`.trim();
+                    return user?.username || nested?.username || 'User';
+                  })()}
                 </Text>
                 <View style={styles.donorBadge}>
                   <Ionicons name="shield-checkmark" size={14} color="#059669" />
@@ -157,14 +260,18 @@ export default function DashboardScreen() {
               </View>
             </View>
             
-            <TouchableOpacity style={styles.logoutButton} onPress={handleLogout}>
+            <TouchableOpacity 
+              style={styles.logoutButton} 
+              onPress={handleLogout}
+              activeOpacity={0.7}
+            >
               <View style={styles.logoutIcon}>
                 <Ionicons name="log-out-outline" size={20} color="#64748B" />
               </View>
             </TouchableOpacity>
           </View>
         </LinearGradient>
-      </View>
+      </Animated.View>
 
       <ScrollView
         style={styles.content}
@@ -177,19 +284,124 @@ export default function DashboardScreen() {
           />
         }
         showsVerticalScrollIndicator={false}
+        contentContainerStyle={styles.scrollContent}
       >
         {/* Trust Badge */}
-        <View style={styles.trustBadge}>
+        <Animated.View 
+          style={[
+            styles.trustBadge,
+            {
+              opacity: fadeAnim,
+              transform: [
+                { translateY: fadeAnim.interpolate({
+                  inputRange: [0, 1],
+                  outputRange: [20, 0]
+                }) }
+              ]
+            }
+          ]}
+        >
           <View style={styles.trustIcon}>
             <Ionicons name="shield-checkmark" size={18} color="#059669" />
           </View>
           <Text style={styles.trustText}>
             Secure • Verified Medical Platform • HIPAA Compliant
           </Text>
-        </View>
+        </Animated.View>
+
+        {/* Impact Score Card */}
+        <Animated.View
+          style={[
+            styles.impactCard,
+            {
+              opacity: fadeAnim,
+              transform: [{ scale: statsScaleAnim }]
+            }
+          ]}
+        >
+          <View style={styles.impactHeader}>
+            <Text style={styles.impactTitle}>Your Impact Score</Text>
+            <TouchableOpacity 
+              style={styles.infoButton}
+              onPress={() => Alert.alert('Impact Score', 'Your impact score is calculated based on frequency of donations, consistency, and lives impacted.')}
+            >
+              <Ionicons name="information-circle-outline" size={20} color="#64748B" />
+            </TouchableOpacity>
+          </View>
+          
+          <View style={styles.impactContent}>
+            <View style={styles.impactScoreContainer}>
+              <View style={styles.progressRingContainer}>
+                <Svg width={120} height={120} viewBox="0 0 100 100">
+                  {/* Background circle */}
+                  <Circle
+                    cx="50"
+                    cy="50"
+                    r="45"
+                    stroke="#F1F5F9"
+                    strokeWidth="10"
+                    fill="transparent"
+                  />
+                  {/* Progress circle */}
+                  <AnimatedCircle
+                    cx="50"
+                    cy="50"
+                    r="45"
+                    stroke="#DC2626"
+                    strokeWidth="10"
+                    fill="transparent"
+                    strokeLinecap="round"
+                    strokeDasharray={`${2 * Math.PI * 45}`}
+                    strokeDashoffset={impactProgressAnim.interpolate({
+                      inputRange: [0, 1],
+                      outputRange: [2 * Math.PI * 45, 0]
+                    })}
+                    rotation="-90"
+                    origin="50, 50"
+                  />
+                </Svg>
+                <Text style={styles.impactScoreText}>{stats.impactScore}</Text>
+              </View>
+            </View>
+            
+            <View style={styles.impactStatsContainer}>
+              <View style={styles.impactStat}>
+                <Animated.View 
+                  style={[
+                    styles.impactStatIcon, 
+                    styles.heartIcon,
+                    {
+                      transform: [{ scale: heartbeatAnim }]
+                    }
+                  ]}
+                >
+                  <Ionicons name="heart" size={20} color="#DC2626" />
+                </Animated.View>
+                <Text style={styles.impactStatNumber}>{stats.livesImpacted}</Text>
+                <Text style={styles.impactStatLabel}>Lives Impacted</Text>
+              </View>
+              
+              <View style={styles.impactStat}>
+                <View style={[styles.impactStatIcon, styles.donationIcon]}>
+                  <Ionicons name="water" size={20} color="#1E40AF" />
+                </View>
+                <Text style={styles.impactStatNumber}>{stats.donationsThisYear}</Text>
+                <Text style={styles.impactStatLabel}>This Year</Text>
+              </View>
+            </View>
+          </View>
+        </Animated.View>
 
         {/* Medical Stats Cards */}
-        <View style={styles.statsContainer}>
+        <Animated.View 
+          style={[
+            styles.statsContainer,
+            {
+              opacity: fadeAnim,
+              transform: [{ scale: statsScaleAnim }]
+            }
+          ]}
+        >
           <Text style={styles.sectionTitle}>Your Medical Profile</Text>
           
           <View style={styles.statsGrid}>
@@ -197,7 +409,10 @@ export default function DashboardScreen() {
               <View style={[styles.statIconContainer, { backgroundColor: '#FEF2F2' }]}>
                 <Ionicons name="heart" size={24} color="#DC143C" />
               </View>
-              <Text style={styles.statNumber}>{stats.totalDonations}</Text>
+              <AnimatedNumber 
+                value={stats.totalDonations} 
+                style={styles.statNumber}
+              />
               <Text style={styles.statLabel}>Total Donations</Text>
               <Text style={styles.statSubLabel}>Lives Saved: {stats.totalDonations * 3}</Text>
             </View>
@@ -215,7 +430,7 @@ export default function DashboardScreen() {
               <View style={[styles.statIconContainer, { backgroundColor: '#F0FDF4' }]}>
                 <Ionicons name="calendar" size={24} color="#059669" />
               </View>
-              <Text style={styles.statNumber}>{stats.lastDonation}</Text>
+              <Text style={styles.statNumber}>{formatDate(stats.lastDonation)}</Text>
               <Text style={styles.statLabel}>Last Donation</Text>
               <Text style={styles.statSubLabel}>Verified Safe</Text>
             </View>
@@ -224,28 +439,110 @@ export default function DashboardScreen() {
               <View style={[styles.statIconContainer, { backgroundColor: '#FFFBEB' }]}>
                 <Ionicons name="time" size={24} color="#D97706" />
               </View>
-              <Text style={styles.statNumber}>{stats.nextEligible}</Text>
+              <Text style={styles.statNumber}>{formatDate(stats.nextEligible)}</Text>
               <Text style={styles.statLabel}>Next Eligible</Text>
               <Text style={styles.statSubLabel}>Medical Guidelines</Text>
             </View>
           </View>
-        </View>
+        </Animated.View>
+
+        {/* Blood Donation Chart */}
+        <Animated.View 
+          style={[
+            styles.chartContainer,
+            {
+              opacity: fadeAnim.interpolate({
+                inputRange: [0, 0.7, 1],
+                outputRange: [0, 0, 1]
+              }),
+              transform: [
+                { 
+                  translateY: fadeAnim.interpolate({
+                    inputRange: [0, 0.7, 1],
+                    outputRange: [40, 40, 0]
+                  })
+                }
+              ]
+            }
+          ]}
+        >
+          <Text style={styles.sectionTitle}>Donation Breakdown</Text>
+          
+          <View style={styles.chartCard}>
+            <PieChart
+              data={chartData}
+              width={width - 80}
+              height={180}
+              chartConfig={{
+                color: (opacity = 1) => `rgba(220, 38, 38, ${opacity})`,
+                labelColor: (opacity = 1) => `rgba(30, 41, 59, ${opacity})`,
+              }}
+              accessor="count"
+              backgroundColor="transparent"
+              paddingLeft="0"
+              absolute
+              hasLegend={false}
+            />
+            
+            <View style={styles.chartLegend}>
+              {chartData.map((item, index) => (
+                <View key={index} style={styles.legendItem}>
+                  <View style={[styles.legendColor, { backgroundColor: item.color }]} />
+                  <Text style={styles.legendText}>{item.name} ({item.count})</Text>
+                </View>
+              ))}
+            </View>
+          </View>
+        </Animated.View>
 
         {/* Medical Quick Actions */}
-        <View style={styles.actionsContainer}>
+        <Animated.View 
+          style={[
+            styles.actionsContainer,
+            {
+              opacity: fadeAnim.interpolate({
+                inputRange: [0, 0.8, 1],
+                outputRange: [0, 0, 1]
+              }),
+              transform: [
+                { 
+                  translateY: fadeAnim.interpolate({
+                    inputRange: [0, 0.8, 1],
+                    outputRange: [40, 40, 0]
+                  })
+                }
+              ]
+            }
+          ]}
+        >
           <Text style={styles.sectionTitle}>Medical Services</Text>
           
           <View style={styles.actionsGrid}>
-            {quickActions.map((action) => (
+            {quickActions.map((action, index) => (
               <TouchableOpacity
                 key={action.id}
                 style={styles.actionCard}
                 onPress={action.onPress}
                 activeOpacity={0.8}
               >
-                <View style={[styles.actionIcon, { backgroundColor: `${action.color}15` }]}>
+                <Animated.View 
+                  style={[
+                    styles.actionIcon, 
+                    { 
+                      backgroundColor: `${action.color}15`,
+                      transform: [
+                        { 
+                          scale: fadeAnim.interpolate({
+                            inputRange: [0, 0.8 + index * 0.05, 1],
+                            outputRange: [0.5, 0.5, 1]
+                          })
+                        }
+                      ]
+                    }
+                  ]}
+                >
                   <Ionicons name={action.icon as any} size={28} color={action.color} />
-                </View>
+                </Animated.View>
                 <Text style={styles.actionTitle}>{action.title}</Text>
                 <Text style={styles.actionSubtitle}>{action.subtitle}</Text>
                 <View style={styles.actionArrow}>
@@ -254,11 +551,36 @@ export default function DashboardScreen() {
               </TouchableOpacity>
             ))}
           </View>
-        </View>
+        </Animated.View>
 
         {/* Medical Impact Banner */}
-        <View style={styles.bannerContainer}>
-          <View style={styles.medicalBanner}>
+        <Animated.View 
+          style={[
+            styles.bannerContainer,
+            {
+              opacity: fadeAnim.interpolate({
+                inputRange: [0, 0.9, 1],
+                outputRange: [0, 0, 1]
+              }),
+              transform: [
+                { 
+                  translateY: fadeAnim.interpolate({
+                    inputRange: [0, 0.9, 1],
+                    outputRange: [30, 30, 0]
+                  })
+                }
+              ]
+            }
+          ]}
+        >
+          <TouchableOpacity 
+            style={styles.medicalBanner}
+            activeOpacity={0.9}
+            onPress={() => Alert.alert(
+              'Medical Safety',
+              'Our platform adheres to the highest medical standards for blood donation processing and delivery, ensuring optimal safety for both donors and recipients.'
+            )}
+          >
             <LinearGradient
               colors={['#DC143C', '#B91C1C']}
               style={styles.bannerGradient}
@@ -275,14 +597,36 @@ export default function DashboardScreen() {
                 </View>
               </View>
             </LinearGradient>
-          </View>
-        </View>
+          </TouchableOpacity>
+        </Animated.View>
 
         {/* Medical Alerts */}
-        <View style={styles.emergencyContainer}>
+        <Animated.View 
+          style={[
+            styles.emergencyContainer,
+            {
+              opacity: fadeAnim.interpolate({
+                inputRange: [0, 0.95, 1],
+                outputRange: [0, 0, 1]
+              }),
+              transform: [
+                { 
+                  translateY: fadeAnim.interpolate({
+                    inputRange: [0, 0.95, 1],
+                    outputRange: [20, 20, 0]
+                  })
+                }
+              ]
+            }
+          ]}
+        >
           <Text style={styles.sectionTitle}>Medical Alerts</Text>
           
-          <View style={styles.alertCard}>
+          <TouchableOpacity 
+            style={styles.alertCard}
+            activeOpacity={0.95}
+            onPress={() => router.push('/emergency')}
+          >
             <View style={styles.alertHeader}>
               <View style={styles.alertIcon}>
                 <Ionicons name="medical" size={20} color="#DC143C" />
@@ -296,7 +640,15 @@ export default function DashboardScreen() {
               Local medical facilities report critical shortage of O-negative blood. 
               FDA-approved donation centers available 24/7.
             </Text>
-            <TouchableOpacity style={styles.alertButton}>
+            <TouchableOpacity 
+              style={styles.alertButton}
+              onPress={() => {
+                if (Platform.OS !== 'web') {
+                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
+                }
+                router.push('/donate');
+              }}
+            >
               <LinearGradient
                 colors={['#DC143C', '#B91C1C']}
                 style={styles.alertButtonGradient}
@@ -305,14 +657,32 @@ export default function DashboardScreen() {
                 <Text style={styles.alertButtonText}>Donate Now</Text>
               </LinearGradient>
             </TouchableOpacity>
-          </View>
-        </View>
+          </TouchableOpacity>
+        </Animated.View>
 
         {/* Medical Safety Information */}
-        <View style={styles.safetyContainer}>
+        <Animated.View 
+          style={[
+            styles.statsContainer,
+            {
+              opacity: fadeAnim.interpolate({
+                inputRange: [0, 1],
+                outputRange: [0, 1]
+              }),
+              transform: [
+                { 
+                  translateY: fadeAnim.interpolate({
+                    inputRange: [0, 1],
+                    outputRange: [20, 0]
+                  })
+                }
+              ]
+            }
+          ]}
+        >
           <Text style={styles.sectionTitle}>Safety & Compliance</Text>
           
-          <View style={styles.safetyCard}>
+          <View style={styles.statCard}>
             <View style={styles.safetyHeader}>
               <Ionicons name="shield-checkmark" size={24} color="#059669" />
               <Text style={styles.safetyTitle}>Medical Standards Certified</Text>
@@ -332,37 +702,80 @@ export default function DashboardScreen() {
               </View>
             </View>
           </View>
-        </View>
+        </Animated.View>
 
-        {/* Bottom spacing for navigation bar */}
+        {/* Bottom spacing */}
         <View style={styles.bottomSpacing} />
       </ScrollView>
-
+      
+      {/* Navigation Bar */}
       <NavigationBar activeRoute="/dashboard" />
     </View>
   );
+}
+
+// Animated Circle for progress
+const AnimatedCircle = Animated.createAnimatedComponent(Circle);
+
+// Animated Number component
+interface AnimatedNumberProps {
+  value: number;
+  style?: any;
+}
+
+function AnimatedNumber({ value, style }: AnimatedNumberProps) {
+  const animatedValue = useRef(new Animated.Value(0)).current;
+  const [displayValue, setDisplayValue] = useState(0);
+
+  useEffect(() => {
+    Animated.timing(animatedValue, {
+      toValue: value,
+      duration: 1000,
+      useNativeDriver: false,
+    }).start();
+
+    const listenerId = animatedValue.addListener((state) => {
+      setDisplayValue(Math.floor(state.value));
+    });
+
+    return () => {
+      animatedValue.removeListener(listenerId);
+    };
+  }, [value]);
+
+  return <Text style={style}>{displayValue}</Text>;
+}
+
+// Format date function
+function formatDate(dateString: string) {
+  if (!dateString) return 'N/A';
+  
+  const date = new Date(dateString);
+  const month = date.toLocaleString('default', { month: 'short' });
+  const day = date.getDate();
+  return `${month} ${day}`;
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#F8FAFC',
+    position: 'relative',
   },
   loadingContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
   },
-  loadingContent: {
-    alignItems: 'center',
-  },
-  loadingSpinner: {
-    marginBottom: 16,
+  loadingAnimation: {
+    width: 150,
+    height: 150,
   },
   loadingText: {
     fontSize: 16,
     color: '#64748B',
     fontWeight: '500',
+    marginTop: 16,
   },
   header: {
     paddingTop: 50,
@@ -461,6 +874,8 @@ const styles = StyleSheet.create({
   },
   content: {
     flex: 1,
+  },
+  scrollContent: {
     paddingHorizontal: 20,
   },
   trustBadge: {
@@ -483,6 +898,118 @@ const styles = StyleSheet.create({
     color: '#059669',
     fontWeight: '600',
     textAlign: 'center',
+  },
+  // --- Added missing styles below ---
+  safetyHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  safetyTitle: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#1E293B',
+    marginLeft: 8,
+  },
+  safetyItems: {
+    marginTop: 8,
+    marginBottom: 4,
+  },
+  safetyItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 6,
+  },
+  safetyItemText: {
+    fontSize: 14,
+    color: '#64748B',
+    marginLeft: 8,
+    fontWeight: '400',
+  },
+  bottomSpacing: {
+    height: 32,
+  },
+  impactCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 16,
+    padding: 20,
+    marginTop: 20,
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 8,
+    elevation: 4,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+  },
+  impactHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  impactTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: '#1E293B',
+  },
+  infoButton: {
+    padding: 4,
+  },
+  impactContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  impactScoreContainer: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  progressRingContainer: {
+    position: 'relative',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  impactScoreText: {
+    position: 'absolute',
+    fontSize: 32,
+    fontWeight: '800',
+    color: '#1E293B',
+  },
+  impactStatsContainer: {
+    flex: 1,
+    flexDirection: 'column',
+    justifyContent: 'space-around',
+    paddingLeft: 16,
+  },
+  impactStat: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  impactStatIcon: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 12,
+  },
+  heartIcon: {
+    backgroundColor: '#FEF2F2',
+  },
+  donationIcon: {
+    backgroundColor: '#EFF6FF',
+  },
+  impactStatNumber: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: '#1E293B',
+    marginRight: 8,
+  },
+  impactStatLabel: {
+    fontSize: 14,
+    color: '#64748B',
   },
   sectionTitle: {
     fontSize: 18,
@@ -542,6 +1069,42 @@ const styles = StyleSheet.create({
     color: '#94A3B8',
     textAlign: 'center',
     fontWeight: '400',
+  },
+  chartContainer: {
+    marginBottom: 32,
+  },
+  chartCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 16,
+    padding: 20,
+    alignItems: 'center',
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 8,
+    elevation: 4,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+  },
+  chartLegend: {
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+    width: '100%',
+    marginTop: 16,
+  },
+  legendItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  legendColor: {
+    width: 12,
+    height: 12,
+    borderRadius: 6,
+    marginRight: 8,
+  },
+  legendText: {
+    fontSize: 12,
+    color: '#64748B',
   },
   actionsContainer: {
     marginBottom: 32,
@@ -668,78 +1231,34 @@ const styles = StyleSheet.create({
     borderRadius: 12,
   },
   urgentText: {
-    fontSize: 10,
+    fontSize: 12,
     color: '#FFFFFF',
-    fontWeight: '700',
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
+    fontWeight: '600',
   },
   alertText: {
     fontSize: 14,
     color: '#64748B',
-    lineHeight: 20,
-    marginBottom: 16,
+    marginBottom: 12,
     fontWeight: '400',
+    lineHeight: 20,
   },
   alertButton: {
-    alignSelf: 'flex-start',
-    borderRadius: 12,
-    overflow: 'hidden',
+    marginTop: 12,
   },
   alertButtonGradient: {
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'center',
     paddingVertical: 12,
     paddingHorizontal: 20,
+    borderRadius: 12,
   },
   alertButtonIcon: {
     marginRight: 8,
   },
   alertButtonText: {
+    fontSize: 14,
     color: '#FFFFFF',
-    fontSize: 14,
     fontWeight: '600',
-  },
-  safetyContainer: {
-    marginBottom: 32,
-  },
-  safetyCard: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 16,
-    padding: 20,
-    borderWidth: 1,
-    borderColor: '#D1FAE5',
-    shadowColor: '#000000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 8,
-    elevation: 4,
-  },
-  safetyHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 16,
-  },
-  safetyTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#1E293B',
-    marginLeft: 12,
-  },
-  safetyItems: {
-    gap: 12,
-  },
-  safetyItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  safetyItemText: {
-    fontSize: 14,
-    color: '#64748B',
-    marginLeft: 12,
-    fontWeight: '400',
-  },
-  bottomSpacing: {
-    height: 120, // Space for navigation bar
   },
 });

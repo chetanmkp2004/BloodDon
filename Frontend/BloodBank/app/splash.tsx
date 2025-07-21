@@ -10,6 +10,7 @@ import {
 import { router } from 'expo-router';
 import { useAuth } from '../src/AuthContext';
 import { LinearGradient } from 'expo-linear-gradient';
+import LottieView from 'lottie-react-native';
 
 const { width, height } = Dimensions.get('window');
 
@@ -17,11 +18,15 @@ export default function SplashScreen() {
   const { isAuthenticated, loading } = useAuth();
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const scaleAnim = useRef(new Animated.Value(0.3)).current;
-  const pulseAnim = useRef(new Animated.Value(1)).current;
   const slideAnim = useRef(new Animated.Value(50)).current;
+  const lottieRef = useRef<LottieView>(null);
 
   useEffect(() => {
     const startAnimations = () => {
+      if (lottieRef.current) {
+        lottieRef.current.play();
+      }
+      
       // Main fade and scale animation
       Animated.parallel([
         Animated.timing(fadeAnim, {
@@ -41,22 +46,6 @@ export default function SplashScreen() {
           useNativeDriver: true,
         }),
       ]).start();
-
-      // Continuous pulse animation
-      Animated.loop(
-        Animated.sequence([
-          Animated.timing(pulseAnim, {
-            toValue: 1.1,
-            duration: 1000,
-            useNativeDriver: true,
-          }),
-          Animated.timing(pulseAnim, {
-            toValue: 1,
-            duration: 1000,
-            useNativeDriver: true,
-          }),
-        ])
-      ).start();
     };
 
     startAnimations();
@@ -84,7 +73,20 @@ export default function SplashScreen() {
         start={{ x: 0, y: 0 }}
         end={{ x: 0, y: 1 }}
       >
-        {/* Medical Pattern Background */}
+        {/* Animated Background Elements */}
+        <Animated.View style={[styles.backgroundCircle, styles.circle1, {
+          opacity: fadeAnim.interpolate({
+            inputRange: [0, 1],
+            outputRange: [0, 0.1],
+          })
+        }]} />
+        <Animated.View style={[styles.backgroundCircle, styles.circle2, {
+          opacity: fadeAnim.interpolate({
+            inputRange: [0, 1],
+            outputRange: [0, 0.15],
+          })
+        }]} />
+
         <View style={styles.backgroundPattern}>
           <View style={[styles.medicalCross, styles.cross1]} />
           <View style={[styles.medicalCross, styles.cross2]} />
@@ -104,24 +106,65 @@ export default function SplashScreen() {
             },
           ]}
         >
-          {/* Professional Logo Container */}
+          {/* Logo with Lottie Animation */}
           <View style={styles.logoContainer}>
-            <Animated.View
-              style={[
-                styles.logoWrapper,
-                {
-                  transform: [{ scale: pulseAnim }],
-                },
-              ]}
-            >
-              <LinearGradient
-                colors={['#DC2626', '#B91C1C']}
-                style={styles.logoGradient}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 1 }}
-              >
-                <Text style={styles.logoEmoji}>🩸</Text>
-              </LinearGradient>
+            <Animated.View style={[styles.logoWrapper]}>
+              <View style={styles.bloodDropContainer}>
+                <Animated.View 
+                  style={[
+                    styles.bloodDrop,
+                    {
+                      transform: [
+                        { 
+                          scale: fadeAnim.interpolate({
+                            inputRange: [0, 0.5, 1],
+                            outputRange: [0.8, 1.1, 1]
+                          }) 
+                        }
+                      ],
+                      opacity: fadeAnim
+                    }
+                  ]} 
+                />
+                <Animated.View 
+                  style={[
+                    styles.bloodRipple,
+                    {
+                      opacity: fadeAnim.interpolate({
+                        inputRange: [0, 1],
+                        outputRange: [0.2, 0.8]
+                      }),
+                      transform: [
+                        { 
+                          scale: fadeAnim.interpolate({
+                            inputRange: [0, 1],
+                            outputRange: [0.6, 1.5]
+                          }) 
+                        }
+                      ]
+                    }
+                  ]} 
+                />
+                <Animated.View 
+                  style={[
+                    styles.bloodShine,
+                    {
+                      opacity: fadeAnim.interpolate({
+                        inputRange: [0, 0.5, 1],
+                        outputRange: [0, 0.7, 0]
+                      }),
+                      transform: [
+                        { 
+                          translateX: fadeAnim.interpolate({
+                            inputRange: [0, 1],
+                            outputRange: [-40, 40]
+                          }) 
+                        }
+                      ]
+                    }
+                  ]} 
+                />
+              </View>
             </Animated.View>
           </View>
 
@@ -175,7 +218,7 @@ export default function SplashScreen() {
             </Text>
           </Animated.View>
 
-          {/* Professional Loading Animation */}
+          {/* Enhanced Loading Animation */}
           <Animated.View
             style={[
               styles.loadingContainer,
@@ -218,18 +261,57 @@ export default function SplashScreen() {
             ]}
           >
             <View style={styles.trustBadges}>
-              <View style={styles.trustBadge}>
+              <Animated.View 
+                style={[
+                  styles.trustBadge,
+                  {
+                    transform: [{
+                      translateY: fadeAnim.interpolate({
+                        inputRange: [0.8, 1],
+                        outputRange: [20, 0],
+                        extrapolate: 'clamp'
+                      })
+                    }]
+                  }
+                ]}
+              >
                 <Text style={styles.trustIcon}>🛡️</Text>
                 <Text style={styles.trustText}>Secure</Text>
-              </View>
-              <View style={styles.trustBadge}>
+              </Animated.View>
+              <Animated.View 
+                style={[
+                  styles.trustBadge,
+                  {
+                    transform: [{
+                      translateY: fadeAnim.interpolate({
+                        inputRange: [0.85, 1],
+                        outputRange: [20, 0],
+                        extrapolate: 'clamp'
+                      })
+                    }]
+                  }
+                ]}
+              >
                 <Text style={styles.trustIcon}>🏥</Text>
                 <Text style={styles.trustText}>Medical Grade</Text>
-              </View>
-              <View style={styles.trustBadge}>
+              </Animated.View>
+              <Animated.View 
+                style={[
+                  styles.trustBadge,
+                  {
+                    transform: [{
+                      translateY: fadeAnim.interpolate({
+                        inputRange: [0.9, 1],
+                        outputRange: [20, 0],
+                        extrapolate: 'clamp'
+                      })
+                    }]
+                  }
+                ]}
+              >
                 <Text style={styles.trustIcon}>👥</Text>
                 <Text style={styles.trustText}>Community</Text>
-              </View>
+              </Animated.View>
             </View>
           </Animated.View>
         </Animated.View>
@@ -246,6 +328,23 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
+  },
+  backgroundCircle: {
+    position: 'absolute',
+    borderRadius: 1000,
+    backgroundColor: '#DC2626',
+  },
+  circle1: {
+    width: width * 1.2,
+    height: width * 1.2,
+    top: -width * 0.6,
+    left: -width * 0.3,
+  },
+  circle2: {
+    width: width * 0.8,
+    height: width * 0.8,
+    bottom: -width * 0.4,
+    right: -width * 0.2,
   },
   // Medical background pattern
   backgroundPattern: {
@@ -304,16 +403,52 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 8 },
     shadowOpacity: 0.3,
     shadowRadius: 15,
-  },
-  logoGradient: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
+    width: 100,
+    height: 100,
     justifyContent: 'center',
     alignItems: 'center',
   },
-  logoEmoji: {
-    fontSize: 40,
+  bloodDropContainer: {
+    position: 'relative',
+    width: 80,
+    height: 80,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  bloodDrop: {
+    width: 60,
+    height: 80,
+    backgroundColor: '#DC2626',
+    borderRadius: 30,
+    position: 'absolute',
+    shadowColor: '#DC2626',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 8,
+  },
+  bloodRipple: {
+    position: 'absolute',
+    width: 100,
+    height: 100,
+    borderRadius: 50,
+    borderWidth: 2,
+    borderColor: '#DC2626',
+    backgroundColor: 'transparent',
+  },
+  bloodShine: {
+    position: 'absolute',
+    width: 20,
+    height: 40,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 10,
+    opacity: 0.3,
+    top: 15,
+    left: 20,
+  },
+  lottieAnimation: {
+    width: 150,
+    height: 150,
   },
   titleContainer: {
     alignItems: 'center',
