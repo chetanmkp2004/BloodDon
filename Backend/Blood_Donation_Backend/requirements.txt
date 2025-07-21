@@ -1,0 +1,28 @@
+# Django Blood Donation Backend Requirements
+# Generated from codebase analysis
+
+# Core Django Framework
+Django==5.2.*
+
+# Django REST Framework for API development
+djangorestframework==3.15.*
+
+# JWT Authentication for secure API access
+djangorestframework-simplejwt==5.3.*
+
+# CORS handling for React Native frontend integration
+django-cors-headers==4.4.*
+
+# Database (using SQLite by default, add specific DB drivers if needed)
+# For PostgreSQL: psycopg2-binary==2.9.*
+# For MySQL: mysqlclient==2.2.*
+
+# Development and Testing Dependencies (optional)
+# pytest-django==4.9.*
+# factory-boy==3.3.*
+# coverage==7.6.*
+
+# Production Dependencies (uncomment for production)
+# gunicorn==22.0.*
+# whitenoise==6.7.*
+# python-decouple==3.8.*
