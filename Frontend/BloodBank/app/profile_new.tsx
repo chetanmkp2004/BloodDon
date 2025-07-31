@@ -27,16 +27,8 @@ export default function ProfileScreen() {
           text: 'Logout', 
           style: 'destructive',
           onPress: async () => {
-            try {
-              console.log('Starting logout from profile...');
-              await logout();
-              console.log('Profile logout completed, redirecting...');
-              router.replace('/login');
-            } catch (error) {
-              console.error('Profile logout error:', error);
-              // Force redirect even if logout fails
-              router.replace('/login');
-            }
+            await logout();
+            router.replace('/login');
           }
         },
       ]

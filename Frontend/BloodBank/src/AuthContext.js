@@ -139,21 +139,30 @@ export const AuthProvider = ({ children }) => {
 
   const logout = async () => {
     try {
-      // Remove all possible token keys
+      console.log('Starting logout process...');
+      // Try to call API logout first
       await ApiService.logout();
-      await AsyncStorage.removeItem('access_token');
-      await AsyncStorage.removeItem('auth_token');
-      await AsyncStorage.removeItem('refresh_token');
-      await ApiService.setCachedUserData(null);
-      dispatch({ type: 'LOGOUT' });
     } catch (error) {
-      console.error('Logout failed:', error);
-      await AsyncStorage.removeItem('access_token');
-      await AsyncStorage.removeItem('auth_token');
-      await AsyncStorage.removeItem('refresh_token');
-      await ApiService.setCachedUserData(null);
-      dispatch({ type: 'LOGOUT' });
+      console.error('API logout failed, continuing with local logout:', error);
     }
+    
+    try {
+      // Clear all tokens and cached data regardless of API call result
+      await AsyncStorage.multiRemove([
+        'access_token',
+        'auth_token', 
+        'refresh_token',
+        'user_data'
+      ]);
+      await ApiService.setCachedUserData(null);
+      console.log('Local storage cleared');
+    } catch (storageError) {
+      console.error('Storage cleanup failed:', storageError);
+    }
+    
+    // Always dispatch logout to update the state
+    dispatch({ type: 'LOGOUT' });
+    console.log('Logout state updated');
   };
 
   useEffect(() => {

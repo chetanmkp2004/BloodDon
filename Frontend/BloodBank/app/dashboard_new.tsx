@@ -94,16 +94,8 @@ export default function DashboardScreen() {
           text: 'Logout', 
           style: 'destructive',
           onPress: async () => {
-            try {
-              console.log('Starting logout process...');
-              await logout();
-              console.log('Logout completed, redirecting to login...');
-              router.replace('/login');
-            } catch (error) {
-              console.error('Logout error:', error);
-              // Force redirect even if logout fails
-              router.replace('/login');
-            }
+            await logout();
+            router.replace('/login');
           }
         },
       ]
@@ -111,7 +103,7 @@ export default function DashboardScreen() {
   };
 
   const handleSearchDonors = () => {
-    router.push('/search-donors' as any);
+    router.push('/search-donors');
   };
 
   const formatDate = (dateString: string) => {

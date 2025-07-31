@@ -103,7 +103,22 @@ class ApiService {
   }
 
   async logout() {
-    await AsyncStorage.multiRemove(['access_token', 'refresh_token']);
+    try {
+      // Try to notify the backend about logout
+      await this.makeRequest('/logout/', { method: 'POST' });
+    } catch (error) {
+      console.log('Backend logout notification failed:', error);
+      // Continue with local logout even if backend call fails
+    }
+    
+    // Always clear local storage
+    await AsyncStorage.multiRemove([
+      'access_token', 
+      'refresh_token',
+      'auth_token',
+      'user_data'
+    ]);
+    console.log('Local tokens cleared');
   }
 
   async getProfile() {
